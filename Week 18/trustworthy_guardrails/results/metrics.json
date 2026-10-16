@@ -1,0 +1,108 @@
+{
+  "input_pii": {
+    "n": 14,
+    "TP": 7,
+    "FP": 1,
+    "FN": 2,
+    "TN": 4,
+    "precision": 0.875,
+    "recall": 0.778,
+    "f1": 0.824
+  },
+  "input_injection": {
+    "n": 17,
+    "TP": 10,
+    "FP": 1,
+    "FN": 2,
+    "TN": 4,
+    "precision": 0.909,
+    "recall": 0.833,
+    "f1": 0.87
+  },
+  "input_topic": {
+    "n": 11,
+    "TP": 5,
+    "FP": 1,
+    "FN": 2,
+    "TN": 3,
+    "precision": 0.833,
+    "recall": 0.714,
+    "f1": 0.769
+  },
+  "output_schema": {
+    "n": 11,
+    "TP": 9,
+    "FP": 0,
+    "FN": 0,
+    "TN": 2,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "output_grounded": {
+    "n": 11,
+    "TP": 5,
+    "FP": 1,
+    "FN": 1,
+    "TN": 4,
+    "precision": 0.833,
+    "recall": 0.833,
+    "f1": 0.833
+  },
+  "output_sensitive": {
+    "n": 10,
+    "TP": 6,
+    "FP": 0,
+    "FN": 2,
+    "TN": 2,
+    "precision": 1.0,
+    "recall": 0.75,
+    "f1": 0.857
+  },
+  "ALL_LABELLED": {
+    "n": 74,
+    "TP": 42,
+    "FP": 4,
+    "FN": 9,
+    "TN": 19,
+    "precision": 0.913,
+    "recall": 0.824,
+    "f1": 0.866
+  },
+  "_summary": {
+    "total": 85,
+    "passed": 72,
+    "failed": [
+      "P12",
+      "P13",
+      "P14",
+      "I10",
+      "I11",
+      "I12",
+      "T07",
+      "T08",
+      "T11",
+      "G09",
+      "G10",
+      "O09",
+      "O10"
+    ],
+    "false_positives": [
+      "P12",
+      "I10",
+      "T07",
+      "G10"
+    ],
+    "false_negatives": [
+      "P13",
+      "P14",
+      "I11",
+      "I12",
+      "T08",
+      "T11",
+      "G09",
+      "O09",
+      "O10"
+    ]
+  }
+}

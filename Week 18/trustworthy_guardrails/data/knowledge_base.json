@@ -1,0 +1,9 @@
+[
+  {"id": "KB-01", "category": "account", "text": "Opening a savings account requires a citizenship certificate and one passport-size photo. The minimum opening balance is NPR 500. KYC must be completed within 30 days of opening."},
+  {"id": "KB-02", "category": "card", "text": "The daily ATM withdrawal limit is NPR 50,000. Debit card replacement costs NPR 300. Replacement cards are delivered within 7 working days."},
+  {"id": "KB-03", "category": "loan", "text": "The personal loan interest rate is 12% per annum. The maximum loan tenure is 5 years. Applicants must submit 6 months of salary statements. The processing fee is 1% of the loan amount."},
+  {"id": "KB-04", "category": "transfer", "text": "Mobile banking transfers up to NPR 100,000 per day. Transfers within Everest Digital Bank are free; transfers to other banks cost NPR 10."},
+  {"id": "KB-05", "category": "support", "text": "The helpline 01-5550000 is open 9:00 AM to 5:00 PM, Sunday to Friday. You can also email support@everestbank.com.np."},
+  {"id": "KB-06", "category": "card", "text": "If your card is lost or stolen, report it immediately through the mobile app or the helpline. The card is blocked instantly after the report."},
+  {"id": "KB-07", "category": "account", "text": "Savings accounts earn 5% interest per annum, paid quarterly."}
+]
