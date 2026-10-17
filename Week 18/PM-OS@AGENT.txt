@@ -1,0 +1,887 @@
+# AgenticPM OS — Project Description and End-to-End Workflow
+
+## 1. Project Overview
+
+AgenticPM OS is an AI-assisted project management system designed to connect project planning, work-item management, developer assignments, dependency management, and engineering activity from GitHub.
+
+The goal is to create a system where project information is maintained in a structured backend, AI assists in converting project requirements into actionable work items, dependencies organize the implementation sequence, and GitHub data provides visibility into actual engineering activity.
+
+The project is being developed incrementally, with each phase introducing a distinct capability.
+
+The current work described in the development notes focuses on:
+
+1. Establishing the core application and infrastructure.
+2. Implementing the Planner Agent.
+3. Validating AI-generated plans before saving them.
+4. Persisting work items and their dependencies in the database.
+5. Integrating GitHub repositories, branches, commits, and pull requests.
+6. Testing the system and organizing changes into reviewable GitHub pull requests.
+
+Execution agents, continuous monitoring, and retrieval-augmented generation (RAG) are not part of the current Planner Agent phase unless explicitly added in a subsequent phase.
+
+---
+
+## 2. Main Project Objectives
+
+The main objectives are:
+
+- Provide a structured project management backend.
+- Represent projects, teams, developers, sprints, and work items.
+- Use an AI Planner Agent to turn project requirements into structured plans.
+- Convert the generated plan into persistent work items.
+- Define dependencies between work items.
+- Prevent invalid dependency relationships, including circular dependencies.
+- Track engineering activity using GitHub repository information.
+- Synchronize repository, branch, commit, and pull-request data.
+- Associate GitHub contributors with developer records.
+- Avoid duplicate records during repeated synchronization.
+- Provide API endpoints for the application's functionality.
+- Test the system using automated tests.
+- Keep changes organized into focused commits and pull requests.
+
+The intended result is a foundation for an AI-assisted project management platform in which structured project plans and real engineering activity can eventually be brought together.
+
+---
+
+## 3. High-Level Architecture
+
+The application is organized into several logical layers.
+
+### 3.1 API Layer
+
+Location:
+`src/api/`
+
+The API layer exposes application functionality through HTTP endpoints.
+
+Responsibilities include:
+
+- Receiving client requests.
+- Validating incoming request data.
+- Calling the appropriate service or agent.
+- Interacting with the database through application services.
+- Returning structured responses.
+- Handling errors.
+
+Relevant areas include:
+
+- `src/api/routes/`
+- `src/api/schemas/`
+
+The routes cover existing project-management functionality, Planner Agent operations, dependencies, repositories, and GitHub integration.
+
+### 3.2 Agent Layer
+
+Location:
+`src/agent/`
+
+The agent layer contains the logic responsible for AI-assisted planning.
+
+Relevant files described in the development notes include:
+
+- `src/agent/agent.py`
+- `src/agent/state.py`
+- `src/agent/llm.py`
+- `src/agent/schemas.py`
+- `src/agent/validator.py`
+
+Responsibilities include:
+
+- Processing planning requests.
+- Managing the state required during planning.
+- Communicating with the configured language model.
+- Producing structured plan data.
+- Validating the generated plan before persistence.
+
+The exact internal sequence and responsibilities of individual functions must be confirmed from the implementation.
+
+### 3.3 Prompt Layer
+
+Location:
+`src/prompts/`
+
+The prompt layer contains instructions that guide the AI model.
+
+Relevant file:
+
+`src/prompts/system_prompts.py`
+
+Its purpose is to centralize planning instructions so that the Planner Agent follows a consistent output format and understands the expected structure of a project plan.
+
+Prompts should make the model's expected output explicit, including the required work-item fields, dependencies, and other planning information supported by the application.
+
+### 3.4 Service Layer
+
+Location:
+`src/services/`
+
+The service layer contains reusable business logic shared by the API and other application components.
+
+Relevant files include:
+
+- `src/services/dependency_service.py`
+- `src/services/dependency_graph.py`
+- `src/services/plan_writer.py`
+
+Responsibilities include:
+
+- Writing generated plans to the database.
+- Creating work items.
+- Handling dependency relationships.
+- Checking dependency graph validity.
+- Reusing business logic across endpoints instead of duplicating it in route handlers.
+
+The service layer should remain independent of HTTP-specific details wherever practical.
+
+### 3.5 Database and Models
+
+Relevant locations:
+
+- `src/models/`
+- `alembic/versions/`
+- `data/seed.py`
+
+The database stores the structured information required by the application.
+
+The model layer defines the entities and relationships used by the project-management backend.
+
+Relevant concepts include:
+
+- Projects.
+- Teams.
+- Developers.
+- Sprints.
+- Work items.
+- Dependencies.
+- Repositories.
+- Branches.
+- Commits.
+- Pull requests.
+- External identities.
+
+The exact schema, constraints, and relationships should be verified against the model definitions and migrations.
+
+Database migrations are used to evolve the schema in a controlled way.
+
+Seed data provides initial records required for development or testing. It should be reviewed to ensure that it is safe to run repeatedly where repeatable seeding is required.
+
+### 3.6 GitHub Integration Layer
+
+Relevant files include:
+
+- `src/tools/github_tool.py`
+- `src/api/routes/github.py`
+- `src/api/routes/repositories.py`
+- `src/api/schemas/github.py`
+
+The GitHub integration retrieves engineering activity from GitHub and stores relevant information in the application's existing data model.
+
+Its responsibilities include:
+
+- Connecting to GitHub using configured credentials.
+- Retrieving repository information.
+- Retrieving branches.
+- Retrieving commits.
+- Retrieving pull requests.
+- Resolving contributors to developer records.
+- Synchronizing external records with local database records.
+- Supporting repeatable synchronization without creating duplicate records.
+
+The implementation notes also discuss webhook-based updates. Webhook support should be considered implemented only where the corresponding endpoint and verification logic actually exist.
+
+### 3.7 Configuration and Infrastructure
+
+Relevant files include:
+
+- `.env.example`
+- `docker-compose.yml`
+- `requirements.txt`
+- `src/utils/config.py`
+- `src/models/base.py`
+- `README.md`
+
+These files support application configuration, dependencies, database setup, containerized development, and project documentation.
+
+Sensitive values must be provided through environment variables or another appropriate secret-management mechanism.
+
+Real API keys and GitHub tokens must never be committed to the repository.
+
+---
+
+## 4. End-to-End System Workflow
+
+The system contains two major workflows:
+
+1. AI-assisted project planning.
+2. GitHub engineering activity synchronization.
+
+These workflows use the same project-management backend but serve different purposes.
+
+The Planner Agent creates structured work items and dependencies from planning requests.
+
+The GitHub integration retrieves external engineering activity and records it in the application's database.
+
+The development notes do not establish that all work items are automatically linked to GitHub commits or pull requests. Such linking should be treated as a separate capability unless it has been implemented explicitly.
+
+---
+
+# PART A — AI PLANNER AGENT WORKFLOW
+
+## 5. Planner Agent Objective
+
+The Planner Agent converts a project-planning request into a structured plan that the application can validate and persist.
+
+Instead of relying exclusively on manually entered work items, the system uses a language model to assist in breaking a project into smaller, actionable units.
+
+The generated plan must be validated before it is written to the database.
+
+The objective is not simply to generate a natural-language answer. The result must conform to a structured representation that the backend can process.
+
+## 6. Planner Agent Request Flow
+
+### Step 1: Receive the planning request
+
+A client submits a request to the Planner Agent endpoint associated with a project.
+
+The development notes identify the endpoint:
+
+`POST /projects/{id}/plan`
+
+The route receives the project identifier and the planning input defined by the corresponding request schema.
+
+The backend should validate the request and verify that the target project exists.
+
+If required input is missing or the project cannot be found, the API should return an appropriate error.
+
+### Step 2: Prepare the planning context
+
+The application prepares the information required by the Planner Agent.
+
+This may include:
+
+- Project information.
+- The user's planning request.
+- Constraints supplied by the application.
+- The expected output schema.
+- Relevant existing records when required by the implementation.
+
+The exact context must be determined from the actual route and agent code. The presence of a project identifier alone does not prove that the agent automatically retrieves every related project record.
+
+### Step 3: Construct the model request
+
+The Planner Agent uses its configured language model and prompt instructions.
+
+The prompt should guide the model to generate a structured project plan instead of an unrestricted prose response.
+
+The expected output should contain the fields required by the application's planning schema.
+
+Depending on the implemented schema, these fields may represent:
+
+- Work-item titles.
+- Work-item descriptions.
+- Work-item types.
+- Priority.
+- Estimated effort.
+- Developer or role assignments.
+- Dependencies between work items.
+
+Only fields supported by the actual schema should be required.
+
+### Step 4: Generate the plan
+
+The language model generates the proposed plan.
+
+The agent should convert the response into the application's expected structured representation.
+
+If the model returns malformed data, missing required fields, or an unsupported structure, the request should fail safely or follow an explicitly implemented recovery strategy.
+
+The system must not assume that an AI-generated plan is valid simply because the model returned a response.
+
+### Step 5: Validate the generated plan
+
+The generated plan passes through the validation logic.
+
+Relevant implementation file:
+
+`src/agent/validator.py`
+
+The validator should check the conditions defined by the application's planning schema and business rules.
+
+Important validation concerns include:
+
+- Required fields are present.
+- Field values have the correct types.
+- Work-item identifiers or references are valid.
+- Dependencies refer to valid work items.
+- Dependency relationships do not contain cycles.
+- Unsupported or malformed relationships are rejected.
+- Invalid plans are not persisted.
+
+The exact checks must be confirmed from the validator implementation.
+
+If validation fails, the application should return a clear error and avoid partially writing an invalid plan.
+
+### Step 6: Prepare database writes
+
+After successful validation, the application passes the structured plan to the plan-writing service.
+
+Relevant file:
+
+`src/services/plan_writer.py`
+
+This service is responsible for translating the generated plan into database records.
+
+It should use the application's existing data models and persistence conventions.
+
+Where a plan includes both work items and their dependencies, the service must ensure that the required records exist before creating relationships between them.
+
+### Step 7: Create work items
+
+The plan-writing service creates the work-item records associated with the plan.
+
+The implementation should respect:
+
+- Required database fields.
+- Existing project relationships.
+- Valid work-item source values.
+- Applicable database constraints.
+- The application's developer and assignment conventions.
+
+The development notes mention a schema change that adds `agent` to the `work_item_source` enum and a seeded Planner developer.
+
+These changes support representing AI-generated work within the existing data model.
+
+The precise meaning of each field should be confirmed from the model and migration definitions.
+
+### Step 8: Create dependency relationships
+
+The application creates the dependencies specified by the plan.
+
+Relevant files:
+
+- `src/services/dependency_service.py`
+- `src/services/dependency_graph.py`
+- `src/api/routes/dependencies.py`
+
+The dependency graph represents relationships between work items.
+
+For example, a backend implementation task may need to be completed before an integration task can begin.
+
+The application should reject dependency relationships that create circular execution requirements.
+
+If task A depends on task B, task B must not indirectly depend on task A.
+
+The system should validate the graph before committing the final set of changes.
+
+### Step 9: Persist the plan safely
+
+The work items and their dependencies should be persisted consistently.
+
+Where the database supports transactions, related writes should be performed in a transaction so that a failure does not leave behind a partially created plan.
+
+The plan-writing service should handle persistence errors and return a useful result to the calling API.
+
+### Step 10: Return the result
+
+The Planner Agent endpoint returns a response indicating the result of the planning operation.
+
+The response format must follow the actual API schema.
+
+A successful response should make it possible for the client to identify the generated work items and understand the result of the operation.
+
+Errors should clearly distinguish invalid input, invalid model output, dependency validation failures, missing projects, and persistence failures where the implementation supports those distinctions.
+
+## 7. Planner Agent Workflow Summary
+
+The complete logical flow is:
+
+Client
+  |
+  v
+POST /projects/{id}/plan
+  |
+  v
+Request and project validation
+  |
+  v
+Prepare planning context
+  |
+  v
+Load prompt and invoke configured language model
+  |
+  v
+Parse structured model output
+  |
+  v
+Validate plan schema and business rules
+  |
+  +---- Invalid plan ----> Return error without persisting invalid data
+  |
+  v
+Plan-writing service
+  |
+  v
+Create work items
+  |
+  v
+Validate and create dependency relationships
+  |
+  v
+Persist related changes safely
+  |
+  v
+Return structured API response
+
+This diagram represents the intended logical workflow. The precise implementation details must be verified against the current source code.
+
+---
+
+# PART B — DEPENDENCY MANAGEMENT
+
+## 8. Dependency Graph Objective
+
+A dependency graph represents the ordering constraints between work items.
+
+It allows the application to express which tasks must be completed before other tasks can proceed.
+
+The dependency implementation should provide a shared and consistent way to create, inspect, and validate dependencies.
+
+Relevant files:
+
+- `src/services/dependency_service.py`
+- `src/services/dependency_graph.py`
+- `src/api/routes/dependencies.py`
+
+## 9. Dependency Management Workflow
+
+### Step 1: Receive a dependency operation
+
+A dependency operation may originate from an API request or from the Planner Agent's generated plan.
+
+### Step 2: Validate the referenced work items
+
+The application checks that the referenced work items exist and that the relationship satisfies the applicable database and business rules.
+
+### Step 3: Check the graph
+
+The dependency service checks whether adding the relationship would produce an invalid graph.
+
+Circular dependencies must be rejected.
+
+For example:
+
+Task A depends on Task B.
+Task B depends on Task C.
+Task C depends on Task A.
+
+This creates a cycle and should not be accepted when the application requires an acyclic dependency graph.
+
+### Step 4: Save the relationship
+
+If the relationship is valid, the application persists it through the shared service logic.
+
+### Step 5: Return the result
+
+The API reports success or a meaningful validation error.
+
+Dependency validation should be centralized so that the Planner Agent and ordinary dependency endpoints do not implement conflicting rules.
+
+---
+
+# PART C — GITHUB INTEGRATION WORKFLOW
+
+## 10. GitHub Integration Objective
+
+The GitHub integration brings external repository activity into AgenticPM OS.
+
+The development notes describe synchronizing repository information, branches, commits, and pull requests into the existing database tables.
+
+The integration is intended to make engineering activity available alongside project-management records.
+
+The notes emphasize reusing existing tables rather than creating an entirely separate data model for GitHub.
+
+## 11. GitHub Backfill Synchronization
+
+Backfill synchronization retrieves existing GitHub data and imports it into the application.
+
+The general workflow is:
+
+### Step 1: Configure GitHub credentials
+
+The application reads the GitHub token from configuration.
+
+The development notes mention `GITHUB_TOKEN`.
+
+The token should have only the permissions required for the repositories being accessed.
+
+Real tokens must be stored outside version control.
+
+### Step 2: Receive a synchronization request
+
+A client requests synchronization for a repository through the relevant API endpoint.
+
+The exact endpoint paths and request parameters must be verified from:
+
+- `src/api/routes/github.py`
+- `src/api/routes/repositories.py`
+- `src/api/schemas/github.py`
+
+### Step 3: Retrieve repository information
+
+The integration retrieves the relevant repository information from GitHub.
+
+The repository is represented in the application's existing repository model.
+
+### Step 4: Retrieve branches
+
+The integration retrieves branches associated with the repository and stores the corresponding records.
+
+Each branch must be associated with the correct local repository record.
+
+### Step 5: Retrieve commits
+
+The integration retrieves the commits covered by its synchronization logic.
+
+The development notes refer to retrieving recent commits per branch.
+
+The actual pagination strategy, historical depth, and rate-limit handling must be verified in the implementation.
+
+### Step 6: Retrieve pull requests
+
+The integration retrieves the pull requests covered by its synchronization logic.
+
+The local records should retain the relevant external identifiers and repository relationships.
+
+### Step 7: Resolve authors
+
+GitHub commit and pull-request authors need to be associated with developer records.
+
+The development notes describe a resolution strategy that checks GitHub external identity first and then email.
+
+If neither matches, the integration may create a developer record.
+
+This behavior is important because the application model requires an author relationship for the relevant records.
+
+The implementation must handle missing or inconsistent identity information carefully to avoid incorrect matches.
+
+### Step 8: Persist synchronized records
+
+The integration writes the retrieved records into the existing database tables.
+
+The notes identify existing concepts such as:
+
+- Repositories.
+- Branches.
+- Commits.
+- Pull requests.
+- Developers.
+- External identities.
+
+### Step 9: Avoid duplicates
+
+Synchronization must be safe to repeat.
+
+The notes describe using upsert-style persistence and existing uniqueness constraints involving repository, source, and external identifiers.
+
+When the same synchronization is run again, existing records should be updated or reused rather than duplicated.
+
+The actual uniqueness constraints and upsert behavior must be verified against the models, migrations, and service code.
+
+### Step 10: Return synchronization results
+
+The API should report the outcome of the operation using the implemented response schema.
+
+Useful information may include the repository synchronized, the categories of records processed, and any errors encountered.
+
+The response should not claim successful synchronization of records that were not actually retrieved or saved.
+
+## 12. GitHub Webhook Workflow
+
+The development notes discuss webhook-based updates for incremental synchronization.
+
+Webhook functionality must be verified against the actual implementation before being treated as complete.
+
+Where implemented, the logical workflow is:
+
+1. GitHub sends an event to the configured webhook endpoint.
+2. The application receives the request.
+3. The application verifies the webhook signature using the configured secret.
+4. Invalid signatures are rejected.
+5. The application identifies the event type.
+6. The integration processes supported events, such as push or pull-request updates.
+7. Relevant local records are inserted or updated.
+8. The application returns an appropriate HTTP response.
+
+The notes mention `GITHUB_WEBHOOK_SECRET`.
+
+Webhook signature verification is essential. The application must not blindly trust incoming webhook requests.
+
+The integration should also handle duplicate event deliveries safely.
+
+If webhook handling is not present in the current code, it should be treated as planned work rather than a completed capability.
+
+## 13. GitHub Integration Workflow Summary
+
+Backfill synchronization:
+
+Client
+  |
+  v
+GitHub synchronization endpoint
+  |
+  v
+Validate request and repository access
+  |
+  v
+GitHub integration tool
+  |
+  +----> Retrieve repository information
+  |
+  +----> Retrieve branches
+  |
+  +----> Retrieve commits
+  |
+  +----> Retrieve pull requests
+  |
+  v
+Resolve contributor identities
+  |
+  v
+Upsert records into existing database tables
+  |
+  v
+Return synchronization result
+
+Incremental synchronization, where implemented:
+
+GitHub Event
+  |
+  v
+Webhook Endpoint
+  |
+  v
+Verify Signature
+  |
+  v
+Identify Supported Event
+  |
+  v
+Process Event
+  |
+  v
+Update Existing Records Safely
+  |
+  v
+Return HTTP Response
+
+These workflows should reuse the same record-mapping and persistence rules wherever practical.
+
+---
+
+# PART D — DATA CONSISTENCY AND ERROR HANDLING
+
+## 14. Data Consistency
+
+The system combines AI-generated planning data with externally retrieved GitHub information.
+
+Both sources must be handled carefully.
+
+The application should enforce:
+
+- Database constraints.
+- Valid foreign-key relationships.
+- Valid dependency relationships.
+- Stable external identifiers.
+- Duplicate-safe synchronization.
+- Consistent developer resolution.
+- Transactional persistence where appropriate.
+- Clear error reporting.
+
+The Planner Agent and GitHub integration should use shared persistence services when they operate on the same underlying entities.
+
+## 15. Error Handling
+
+Important failure scenarios include:
+
+### Planner Agent errors
+
+- Missing project.
+- Invalid request.
+- Language-model request failure.
+- Malformed model output.
+- Missing required work-item fields.
+- Invalid dependency references.
+- Circular dependency.
+- Database persistence failure.
+
+### GitHub integration errors
+
+- Missing or invalid credentials.
+- Repository access denied.
+- Repository not found.
+- GitHub API errors.
+- Rate limits.
+- Pagination failures.
+- Incomplete external identity information.
+- Duplicate events.
+- Invalid webhook signature.
+- Database persistence failure.
+
+Errors should be handled at appropriate boundaries.
+
+The API should return useful client-facing messages without exposing secrets, access tokens, stack traces, or other sensitive internal details.
+
+---
+
+# PART E — TESTING STRATEGY
+
+## 16. Automated Testing
+
+The development notes identify tests related to the validator, plan writer, and Planner Agent API.
+
+Relevant test files include:
+
+- `tests/conftest.py`
+- `tests/test_validator.py`
+- `tests/test_plan_writer.py`
+- `tests/test_planner_api.py`
+
+The notes also reference `pytest.ini`.
+
+The test suite should verify the actual behavior of the implementation.
+
+### 16.1 Validator tests
+
+Test cases should cover:
+
+- Valid structured plans.
+- Missing required fields.
+- Incorrect field types.
+- Invalid dependency references.
+- Circular dependencies.
+- Other invalid relationships supported by the validator.
+
+### 16.2 Plan writer tests
+
+Test cases should cover:
+
+- Successful creation of work items.
+- Correct project relationships.
+- Creation of valid dependencies.
+- Handling of invalid plans.
+- Database failures.
+- Prevention of partial persistence where transactional behavior is required.
+
+### 16.3 Planner API tests
+
+Test cases should cover:
+
+- Successful planning requests.
+- Invalid request data.
+- Missing projects.
+- Invalid model output.
+- Validation failures.
+- Persistence errors.
+- Correct response structures.
+
+Tests should use controlled model responses where possible rather than depending on live LLM calls for every test.
+
+### 16.4 Dependency tests
+
+Test cases should cover:
+
+- Valid dependency creation.
+- Invalid work-item references.
+- Cycle rejection.
+- Repeated operations where idempotency is expected.
+
+### 16.5 GitHub integration tests
+
+The test suite should cover the integration behaviors that are actually implemented.
+
+Useful cases include:
+
+- Correct mapping of external records.
+- Correct repository and branch relationships.
+- Developer identity resolution.
+- Repeated synchronization without duplicates.
+- Pagination and API failures.
+- Webhook signature validation, if webhook support exists.
+- Handling of repeated webhook events.
+
+### 16.6 Regression tests
+
+Existing Phase 1 functionality should continue working after new changes are introduced.
+
+Changes to shared services, models, migrations, configuration, or router registration can affect existing endpoints.
+
+Run the complete applicable test suite before submitting changes.
+
+The presence of a test file does not establish that its tests pass. Test results must be obtained by running the suite.
+
+---
+
+# PART F — DEVELOPMENT AND GIT WORKFLOW
+
+## 17. Development Phases
+
+The development notes describe a phased approach.
+
+### Phase 1: Core Application Foundation
+
+The initial phase established the application setup, project structure, configuration, Docker-related infrastructure, and core project-management functionality.
+
+The notes confirm that the Phase 1 pull request was merged into `main`.
+
+The current remote history includes the Phase 1 merge and later updates to the project documentation.
+
+### Phase 2: Planner Agent
+
+The Planner Agent phase adds AI-assisted planning and the supporting infrastructure.
+
+Its scope includes:
+
+- Planner Agent logic.
+- Structured model output.
+- Plan validation.
+- Work-item persistence.
+- Dependency validation and persistence.
+- API integration.
+- Related database changes.
+- Automated tests.
+
+### GitHub Integration
+
+The GitHub integration adds synchronization between GitHub and the application's existing data model.
+
+Its scope includes the implemented repository, branch, commit, pull-request, and contributor synchronization behavior.
+
+The Planner Agent and GitHub integration should be kept in clearly identifiable commits or separate pull requests where appropriate.
+
+The development notes explicitly warn against mixing unrelated features into a pull request whose description claims to contain only GitHub integration.
+
+---
+
+## 18. Safe Git Workflow
+
+All changes should be committed on an appropriate feature branch rather than being committed directly to `main`.
+
+The development notes identify the branch name:
+
+`planner-agent-phase2`
+
+They also discuss a separate branch:
+
+`feature/github-integration`
+
+Use the branch corresponding to the changes being submitted.
+
+### Step 1: Inspect the repository
+
+Run:
+
+```bash
+git status
+git branch
+git fetch origin
+git log --oneline origin/main -5
