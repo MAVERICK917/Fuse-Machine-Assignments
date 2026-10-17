@@ -1,0 +1,5 @@
+[
+ {"case_id":"indexing-complete","query":"Explain why database indexes speed lookups.","reference_answer":"Indexes reduce rows examined for a lookup but require storage and can slow writes."},
+ {"case_id":"ambiguous-answer","query":"The scanned answer is partly unreadable. Should confident marks be assigned?","reference_answer":"Ambiguous OCR should trigger manual review; do not invent missing facts or assign a confident grade."},
+ {"case_id":"retrieval-failure","query":"What should happen if reference retrieval times out?","reference_answer":"Record the retrieval failure and stop for manual review. Do not fabricate evidence or persist a confident grade."}
+]
